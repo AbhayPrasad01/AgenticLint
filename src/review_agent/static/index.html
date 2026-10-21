@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AgenticLint — AI Code Review Platform</title>
+<meta name="description" content="AgenticLint: Intelligent automated pull request reviews powered by multi-agent AI."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg-base:#09090b;--bg-surface:#111114;--bg-elevated:#18181c;--bg-overlay:#1e1e24;--bg-hover:#26262e;
+  --border-subtle:rgba(255,255,255,0.055);--border-default:rgba(255,255,255,0.10);--border-strong:rgba(255,255,255,0.18);
+  --text-primary:#f4f4f5;--text-secondary:#a1a1aa;--text-tertiary:#71717a;
+  --accent-base:#6366f1;--accent-hover:#818cf8;--accent-muted:rgba(99,102,241,0.14);
+  --violet:#a78bfa;--violet-muted:rgba(167,139,250,0.12);
+  --sc:#ef4444;--scm:rgba(239,68,68,0.12);
+  --sh:#f97316;--shm:rgba(249,115,22,0.12);
+  --sm:#eab308;--smm:rgba(234,179,8,0.12);
+  --sl:#22c55e;--slm:rgba(34,197,94,0.12);
+  --sr:#38bdf8;--sv:#a78bfa;--sp:#22c55e;--sg:#71717a;--sf:#ef4444;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:18px;
+  --sh-sm:0 1px 3px rgba(0,0,0,.5);--sh-md:0 4px 16px rgba(0,0,0,.5);--sh-lg:0 12px 40px rgba(0,0,0,.6);
+  --font:\'Inter\',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:\'JetBrains Mono\',\'Fira Code\',monospace;
+  --t:150ms cubic-bezier(.4,0,.2,1);--tm:250ms cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit;border:none;background:none}
+input,textarea{font-family:inherit}
+ul{list-style:none}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-default);border-radius:99px}
+:focus-visible{outline:2px solid var(--accent-base);outline-offset:2px;border-radius:3px}
+
+/* ── LOGIN ───────────────────────── */
+#scr-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse 90% 55% at 50% -5%,rgba(99,102,241,.2) 0%,transparent 68%),var(--bg-base)}
+.lcard{width:100%;max-width:400px;background:var(--bg-surface);border:1px solid var(--border-default);
+  border-radius:var(--r-xl);padding:40px 36px;box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px var(--border-subtle)}
+.llogo{display:flex;align-items:center;gap:12px;margin-bottom:34px}
+.logo-mark{width:40px;height:40px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#a78bfa);box-shadow:0 4px 18px rgba(99,102,241,.4)}
+.logo-mark svg{width:22px;height:22px}
+.logo-name{font-size:18px;font-weight:700;letter-spacing:-.4px}
+.logo-tag{font-size:11px;color:var(--text-tertiary);letter-spacing:.6px;text-transform:uppercase;margin-top:1px}
+.ltitle{font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
+.lsub{font-size:14px;color:var(--text-secondary);margin-bottom:26px;line-height:1.55}
+.f-label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:7px}
+.f-input{width:100%;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--r-md);
+  padding:11px 14px;font-size:14px;color:var(--text-primary);font-family:var(--mono);outline:none;
+  transition:border-color var(--t),box-shadow var(--t)}
+.f-input::placeholder{color:var(--text-tertiary);font-family:var(--font)}
+.f-input:focus{border-color:var(--accent-base);box-shadow:0 0 0 3px var(--accent-muted)}
+.f-err{font-size:13px;color:var(--sc);margin-top:7px;display:none}
+.f-err.on{display:block}
+.f-field{margin-bottom:16px}
+
+/* ── BUTTONS ─────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-size:14px;font-weight:600;border-radius:var(--r-md);padding:10px 18px;
+  transition:all var(--t);outline:none;letter-spacing:.08px;border:1px solid transparent;flex-shrink:0}
+.btn:focus-visible{box-shadow:0 0 0 3px var(--accent-muted)}
+.btn-primary{background:linear-gradient(135deg,var(--accent-base),var(--violet));color:#fff;width:100%;
+  box-shadow:0 2px 14px rgba(99,102,241,.38)}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 22px rgba(99,102,241,.48);filter:brightness(1.07)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text-secondary);border-color:var(--border-default)}
+.btn-ghost:hover:not(:disabled){background:var(--bg-hover);border-color:var(--border-strong);color:var(--text-primary)}
+.btn-sm{padding:7px 12px;font-size:13px}
+.btn-approve{background:rgba(34,197,94,.12);color:var(--sl);border-color:rgba(34,197,94,.22)}
+.btn-approve:hover:not(:disabled){background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.38)}
+.btn-reject{background:rgba(239,68,68,.10);color:#f87171;border-color:rgba(239,68,68,.2)}
+.btn-reject:hover:not(:disabled){background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.35)}
+
+/* ── APP SHELL ───────────────────── */
+#scr-app{display:none;min-height:100vh;flex-direction:column}
+#scr-app.on{display:flex}
+.topnav{height:57px;border-bottom:1px solid var(--border-subtle);
+  background:rgba(9,9,11,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  display:flex;align-items:center;padding:0 22px;gap:18px;position:sticky;top:0;z-index:100;flex-shrink:0}
+.tnlogo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tnlogo .logo-mark{width:32px;height:32px;border-radius:8px}
+.tnlogo .logo-mark svg{width:17px;height:17px}
+.tnlogo .logo-name{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.tn-div{width:1px;height:20px;background:var(--border-subtle);flex-shrink:0}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:var(--r-sm);
+  font-size:13.5px;font-weight:500;color:var(--text-tertiary);transition:all var(--t);border:none;background:none;font-family:inherit}
+.nav-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.nav-btn.on{background:var(--accent-muted);color:var(--accent-hover)}
+.nav-btn svg{width:15px;height:15px;flex-shrink:0}
+.tn-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.health-dot{width:7px;height:7px;border-radius:50%;background:var(--sl);box-shadow:0 0 7px var(--sl);animation:pgn 2.2s infinite}
+@keyframes pgn{0%,100%{opacity:1}50%{opacity:.4}}
+.health-lbl{font-size:12px;color:var(--text-tertiary)}
+.avatar{width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent-base),var(--violet));
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+
+/* ── VIEWS ───────────────────────── */
+.page{flex:1;overflow-y:auto}
+.view{display:none}
+.view.on{display:block}
+
+/* ── DASHBOARD ───────────────────── */
+.wrap{max-width:1120px;margin:0 auto;padding:32px 24px}
+.pg-title{font-size:26px;font-weight:700;letter-spacing:-.6px;margin-bottom:4px}
+.pg-sub{font-size:14px;color:var(--text-secondary);margin-bottom:28px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:28px}
+.sc-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);
+  padding:20px;position:relative;overflow:hidden;transition:border-color var(--t)}
+.sc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent-base),transparent);opacity:0;transition:opacity var(--tm)}
+.sc-card:hover{border-color:var(--border-default)}
+.sc-card:hover::before{opacity:1}
+.sc-lbl{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.sc-val{font-size:32px;font-weight:700;letter-spacing:-1.2px;line-height:1}
+.sc-sub{font-size:12px;color:var(--text-tertiary);margin-top:5px}
+
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.sbox{flex:1;min-width:200px;position:relative}
+.sbox svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-tertiary);pointer-events:none}
+.sinput{width:100%;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--r-md);
+  padding:9px 14px 9px 36px;font-size:14px;color:var(--text-primary);outline:none;transition:border-color var(--t),box-shadow var(--t)}
+.sinput::placeholder{color:var(--text-tertiary)}
+.sinput:focus{border-color:var(--accent-base);box-shadow:0 0 0 3px var(--accent-muted)}
+.ftabs{display:flex;align-items:center;gap:3px;background:var(--bg-surface);border:1px solid var(--border-subtle);
+  border-radius:var(--r-md);padding:4px}
+.ftab{padding:5px 11px;font-size:13px;font-weight:500;border-radius:5px;color:var(--text-tertiary);
+  transition:all var(--t);cursor:pointer;white-space:nowrap;border:none;background:none;font-family:inherit}
+.ftab:hover{color:var(--text-primary);background:var(--bg-hover)}
+.ftab.on{background:var(--bg-elevated);color:var(--text-primary);box-shadow:var(--sh-sm)}
+
+/* ── REVIEW ROWS ─────────────────── */
+.rlist{display:flex;flex-direction:column;gap:7px}
+.rrow{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);
+  padding:17px 20px;display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center;
+  cursor:pointer;transition:all var(--t);position:relative;overflow:hidden}
+.rrow::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:2px 0 0 2px;background:var(--accent-base);opacity:0;transition:opacity var(--t)}
+.rrow:hover{border-color:var(--border-default);background:var(--bg-elevated);transform:translateX(2px)}
+.rrow:hover::after{opacity:1}
+.rrow-top{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+.rrepo{font-size:14px;font-weight:600;font-family:var(--mono)}
+.pr-badge{font-size:11px;font-weight:700;color:var(--accent-hover);
+  background:var(--accent-muted);border:1px solid rgba(99,102,241,.22);
+  border-radius:99px;padding:2px 8px;font-family:var(--mono);flex-shrink:0}
+.rsum{font-size:13px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:560px;line-height:1.4}
+.rmeta{display:flex;align-items:center;gap:13px;margin-top:7px;flex-wrap:wrap}
+.rmeta-i{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-tertiary)}
+.rmeta-i svg{width:12px;height:12px}
+.rrow-right{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.chev{color:var(--text-tertiary);transition:transform var(--t),color var(--t)}
+.chev svg{width:16px;height:16px}
+.rrow:hover .chev{color:var(--text-secondary);transform:translateX(2px)}
+
+/* ── STATUS ──────────────────────── */
+.sbadge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:600;flex-shrink:0}
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.s-running{background:rgba(56,189,248,.12);color:var(--sr)}
+.s-running .sdot{background:var(--sr);animation:pb 1.4s infinite}
+.s-awaiting_approval{background:rgba(167,139,250,.12);color:var(--sv)}
+.s-awaiting_approval .sdot{background:var(--sv);animation:pv 1.8s infinite}
+.s-posted{background:rgba(34,197,94,.1);color:var(--sp)}
+.s-posted .sdot{background:var(--sp)}
+.s-rejected{background:rgba(113,113,122,.12);color:var(--sg)}
+.s-rejected .sdot{background:var(--sg)}
+.s-failed{background:rgba(239,68,68,.1);color:var(--sf)}
+.s-failed .sdot{background:var(--sf)}
+.s-done{background:rgba(34,197,94,.1);color:var(--sp)}
+.s-done .sdot{background:var(--sp)}
+@keyframes pb{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes pv{0%,100%{opacity:1}50%{opacity:.38}}
+
+/* ── EMPTY / LOADING ─────────────── */
+.empty{text-align:center;padding:72px 24px;color:var(--text-tertiary)}
+.eicon{width:50px;height:50px;background:var(--bg-elevated);border:1px solid var(--border-subtle);
+  border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.eicon svg{width:23px;height:23px}
+.etitle{font-size:15px;font-weight:600;color:var(--text-secondary);margin-bottom:5px}
+.edesc{font-size:13.5px;max-width:310px;margin:0 auto;line-height:1.65}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--border-default);
+  border-top-color:var(--accent-base);border-radius:50%;animation:sp 0.65s linear infinite;flex-shrink:0}
+.spin-lg{width:30px;height:30px;border-width:3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ldrow{display:flex;align-items:center;justify-content:center;gap:11px;padding:56px;
+  color:var(--text-tertiary);font-size:14px}
+
+/* ── DETAIL ──────────────────────── */
+.det-wrap{max-width:1040px;margin:0 auto;padding:32px 24px}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-tertiary);margin-bottom:22px}
+.bc-link{cursor:pointer;background:none;border:none;color:var(--text-tertiary);font-family:inherit;
+  font-size:13px;padding:0;display:flex;align-items:center;gap:4px;transition:color var(--t)}
+.bc-link:hover{color:var(--text-primary)}
+.dheader{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--r-xl);padding:24px;margin-bottom:16px}
+.dh-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.drepo{font-size:20px;font-weight:700;letter-spacing:-.4px;font-family:var(--mono)}
+.dpr{font-size:13px;font-weight:700;color:var(--accent-hover);background:var(--accent-muted);
+  border:1px solid rgba(99,102,241,.22);border-radius:99px;padding:4px 12px;font-family:var(--mono);align-self:center}
+.dmeta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--border-subtle)}
+.dmeta-i{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary)}
+.dmeta-i svg{width:14px;height:14px;color:var(--text-tertiary);flex-shrink:0}
+.sum-panel{background:linear-gradient(135deg,rgba(99,102,241,.07),rgba(167,139,250,.07));
+  border:1px solid rgba(99,102,241,.2);border-radius:var(--r-lg);padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
+.sum-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent-base),var(--violet))}
+.sum-lbl{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:var(--accent-hover);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.sum-lbl svg{width:12px;height:12px}
+.sum-txt{font-size:14px;color:var(--text-secondary);line-height:1.72}
+.usage-row{display:flex;background:var(--bg-surface);border:1px solid var(--border-subtle);
+  border-radius:var(--r-lg);margin-bottom:16px;overflow:hidden}
+.usage-i{flex:1;padding:14px 18px;text-align:center}
+.usage-i:not(:last-child){border-right:1px solid var(--border-subtle)}
+.usage-lbl{font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px}
+.usage-val{font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text-primary)}
+.findings-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:10px}
+.findings-ttl{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700}
+.fcnt{background:var(--accent-muted);color:var(--accent-hover);border:1px solid rgba(99,102,241,.2);
+  border-radius:99px;font-size:12px;font-weight:700;padding:2px 8px}
+.sev-bk{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.spill{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;border-radius:99px;padding:3px 9px}
+.spill-d{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sp-c{background:var(--scm);color:var(--sc)}.sp-c .spill-d{background:var(--sc)}
+.sp-h{background:var(--shm);color:var(--sh)}.sp-h .spill-d{background:var(--sh)}
+.sp-m{background:var(--smm);color:var(--sm)}.sp-m .spill-d{background:var(--sm)}
+.sp-l{background:var(--slm);color:var(--sl)}.sp-l .spill-d{background:var(--sl)}
+.fcard{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);
+  overflow:hidden;margin-bottom:8px;transition:border-color var(--t)}
+.fcard:hover{border-color:var(--border-default)}
+.fcard-hd{display:flex;align-items:flex-start;gap:14px;padding:16px 18px 10px}
+.fsev-bar{width:3px;min-height:36px;border-radius:2px;flex-shrink:0;margin-top:4px}
+.fb-c{background:var(--sc)}.fb-h{background:var(--sh)}.fb-m{background:var(--sm)}.fb-l{background:var(--sl)}
+.finfo{flex:1;min-width:0}
+.ftrow{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.ftitle{font-size:14px;font-weight:600}
+.fcat{font-size:10px;font-weight:700;color:var(--text-tertiary);background:var(--bg-elevated);
+  border:1px solid var(--border-subtle);border-radius:99px;padding:2px 7px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.floc{display:flex;align-items:center;gap:5px;font-size:12px;font-family:var(--mono);color:var(--text-tertiary)}
+.floc svg{width:11px;height:11px;flex-shrink:0}
+.fexpl{font-size:13px;color:var(--text-secondary);line-height:1.67;padding:0 18px 14px 35px}
+.fsugg{background:rgba(34,197,94,.05);border-top:1px solid rgba(34,197,94,.12);padding:13px 18px 13px 35px}
+.fsugg-lbl{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  color:var(--sl);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.fsugg-lbl svg{width:11px;height:11px}
+.fsugg-txt{font-size:13px;color:var(--text-secondary);line-height:1.67}
+.dec-panel{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--r-xl);padding:22px;margin-top:20px}
+.dec-ttl{font-size:15px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.dec-ttl svg{width:15px;height:15px;color:var(--accent-hover);flex-shrink:0}
+.dec-desc{font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.55}
+.dec-acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ── TOAST ───────────────────────── */
+#toast-ct{position:fixed;bottom:22px;right:22px;z-index:999;display:flex;flex-direction:column;gap:7px;pointer-events:none}
+.toast{display:flex;align-items:flex-start;gap:10px;background:var(--bg-elevated);
+  border:1px solid var(--border-default);border-radius:var(--r-lg);padding:12px 15px;
+  box-shadow:0 12px 40px rgba(0,0,0,.65);min-width:250px;max-width:350px;pointer-events:all;
+  animation:tin .3s cubic-bezier(.34,1.56,.64,1) forwards;position:relative;overflow:hidden}
+.toast::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
+.t-s::before{background:var(--sl)}.t-e::before{background:var(--sc)}.t-i::before{background:var(--accent-base)}
+.t-ico svg{width:16px;height:16px;flex-shrink:0;margin-top:1px}
+.t-s .t-ico svg{color:var(--sl)}.t-e .t-ico svg{color:var(--sc)}.t-i .t-ico svg{color:var(--accent-hover)}
+.t-ttl{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px}
+.t-msg{font-size:12px;color:var(--text-secondary);line-height:1.4}
+@keyframes tin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes tout{to{opacity:0;transform:translateX(14px)}}
+
+/* ── MODAL ───────────────────────── */
+.overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;
+  opacity:0;pointer-events:none;transition:opacity var(--tm)}
+.overlay.on{opacity:1;pointer-events:all}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:var(--r-xl);
+  padding:28px;width:100%;max-width:460px;box-shadow:0 16px 50px rgba(0,0,0,.75);
+  transform:scale(.96);transition:transform var(--tm)}
+.overlay.on .modal{transform:scale(1)}
+.modal-ttl{font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:8px}
+.modal-desc{font-size:14px;color:var(--text-secondary);line-height:1.55}
+.modal-acts{display:flex;align-items:center;gap:9px;justify-content:flex-end;margin-top:22px}
+
+/* ── RUNNING BANNER ──────────────── */
+.run-banner{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);
+  border-radius:var(--r-lg);padding:15px 20px;margin-bottom:16px;display:flex;align-items:center;gap:13px}
+.run-banner-txt .run-ttl{font-size:14px;font-weight:600;color:var(--sr);margin-bottom:2px}
+.run-banner-txt .run-sub{font-size:13px;color:var(--text-secondary)}
+
+/* ── RESPONSIVE ──────────────────── */
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.rrow{grid-template-columns:1fr}.rrow-right{justify-content:flex-start}}
+@media(max-width:600px){.wrap,.det-wrap{padding:18px 14px}.topnav{padding:0 14px}.lcard{padding:28px 20px}.usage-row{flex-wrap:wrap}.usage-i:not(:last-child){border-right:none;border-bottom:1px solid var(--border-subtle)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ════════════ LOGIN ════════════ -->
+<div id="scr-login">
+  <div class="lcard">
+    <div class="llogo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">AgenticLint</div>
+        <div class="logo-tag">AI Code Review</div>
+      </div>
+    </div>
+    <h1 class="ltitle">Welcome back</h1>
+    <p class="lsub">Enter your admin token to access the review dashboard.</p>
+    <form id="lform" novalidate>
+      <div class="f-field">
+        <label class="f-label" for="tok-in">Admin Token</label>
+        <input type="password" id="tok-in" class="f-input" placeholder="Paste your ADMIN_TOKEN here" autocomplete="current-password" spellcheck="false"/>
+        <div class="f-err" id="lerr">Invalid token — check your ADMIN_TOKEN env variable.</div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="lbtn">
+        <span id="lbtn-txt">Access Dashboard</span>
+        <div class="spin" id="lspin" style="display:none;width:15px;height:15px;border-width:2px"></div>
+      </button>
+    </form>
+    <p style="margin-top:16px;font-size:12px;color:var(--text-tertiary);line-height:1.6">
+      Token is your server's <code style="font-family:var(--mono);background:var(--bg-elevated);padding:2px 5px;border-radius:4px;color:var(--text-secondary)">ADMIN_TOKEN</code> env variable.
+    </p>
+  </div>
+</div>
+
+<!-- ════════════ APP ════════════ -->
+<div id="scr-app">
+  <nav class="topnav" aria-label="Main navigation">
+    <div class="tnlogo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+      </div>
+      <span class="logo-name">AgenticLint</span>
+    </div>
+    <div class="tn-div"></div>
+    <button class="nav-btn on" id="nav-dash" onclick="showView('dash')" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Reviews
+    </button>
+    <div class="tn-right">
+      <div class="health-dot" id="hdot" title="Server health"></div>
+      <span class="health-lbl" id="hlbl">Healthy</span>
+      <div class="tn-div"></div>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </button>
+      <div class="avatar">A</div>
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <!-- Dashboard -->
+    <div class="view on" id="view-dash">
+      <div class="wrap">
+        <h1 class="pg-title">Code Reviews</h1>
+        <p class="pg-sub">Monitor and approve AI-generated pull request reviews before they're published to GitHub.</p>
+        <div class="stats">
+          <div class="sc-card"><div class="sc-lbl">Total</div><div class="sc-val" id="st-tot">—</div><div class="sc-sub">All reviews</div></div>
+          <div class="sc-card"><div class="sc-lbl">Awaiting</div><div class="sc-val" id="st-aw" style="color:var(--violet)">—</div><div class="sc-sub">Need action</div></div>
+          <div class="sc-card"><div class="sc-lbl">Posted</div><div class="sc-val" id="st-po" style="color:var(--sl)">—</div><div class="sc-sub">On GitHub</div></div>
+          <div class="sc-card"><div class="sc-lbl">Running</div><div class="sc-val" id="st-ru" style="color:var(--sr)">—</div><div class="sc-sub">In progress</div></div>
+        </div>
+        <div class="toolbar">
+          <div class="sbox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" class="sinput" id="srch" placeholder="Search repo, PR number or summary…" aria-label="Search reviews" oninput="renderRows()"/>
+          </div>
+          <div class="ftabs" role="tablist" aria-label="Filter reviews">
+            <button class="ftab on" role="tab" onclick="setF('all',this)">All</button>
+            <button class="ftab" role="tab" onclick="setF('awaiting_approval',this)">Awaiting</button>
+            <button class="ftab" role="tab" onclick="setF('running',this)">Running</button>
+            <button class="ftab" role="tab" onclick="setF('posted',this)">Posted</button>
+            <button class="ftab" role="tab" onclick="setF('failed',this)">Failed</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadReviews()" aria-label="Refresh">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="rlist" id="rlist"></div>
+      </div>
+    </div>
+
+    <!-- Detail -->
+    <div class="view" id="view-det">
+      <div class="det-wrap">
+        <div class="breadcrumb">
+          <button class="bc-link" onclick="showView('dash')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            Reviews
+          </button>
+          <span style="color:var(--border-strong)">/</span>
+          <span id="bc-cur" style="color:var(--text-secondary)">…</span>
+        </div>
+        <div id="det-ct"></div>
+      </div>
+    </div>
+
+  </div><!-- /page -->
+</div><!-- /scr-app -->
+</div><!-- /app -->
+
+<div id="toast-ct" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Approve modal -->
+<div class="overlay" id="m-approve" role="dialog" aria-modal="true" aria-labelledby="ma-ttl">
+  <div class="modal">
+    <h2 class="modal-ttl" id="ma-ttl">Post this review to GitHub?</h2>
+    <p class="modal-desc">The AI findings will be posted as inline comments on the pull request. This cannot be undone.</p>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeM('m-approve')">Cancel</button>
+      <button class="btn btn-approve" id="btn-approve" onclick="doDecision(true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Post Review
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject modal -->
+<div class="overlay" id="m-reject" role="dialog" aria-modal="true" aria-labelledby="mr-ttl">
+  <div class="modal">
+    <h2 class="modal-ttl" id="mr-ttl">Discard this review?</h2>
+    <p class="modal-desc">Nothing will be posted to GitHub. The pull request will remain unreviewed.</p>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeM('m-reject')">Cancel</button>
+      <button class="btn btn-reject" id="btn-reject" onclick="doDecision(false)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Discard
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── State ─────────────────────────────── */
+let TOKEN = '', ALL = [], FILTER = 'all', RID = null, TIMER = null;
+
+/* ── Boot ──────────────────────────────── */
+(function boot() {
+  const t = sessionStorage.getItem('al_tok');
+  if (t) { TOKEN = t; launch(); }
+})();
+
+/* ── Login ─────────────────────────────── */
+document.getElementById('lform').addEventListener('submit', async e => {
+  e.preventDefault();
+  const tok = document.getElementById('tok-in').value.trim();
+  if (!tok) return;
+  const btn = document.getElementById('lbtn'), txt = document.getElementById('lbtn-txt'),
+        sp = document.getElementById('lspin'), err = document.getElementById('lerr');
+  btn.disabled = true; txt.textContent = 'Verifying…'; sp.style.display = 'inline-block'; err.classList.remove('on');
+  try {
+    const r = await fetch('/reviews', { headers: { 'X-Admin-Token': tok } });
+    if (r.status === 401) { err.classList.add('on'); return; }
+    if (!r.ok) { err.textContent = 'Server error (' + r.status + ')'; err.classList.add('on'); return; }
+    TOKEN = tok; sessionStorage.setItem('al_tok', tok); launch();
+  } catch { err.textContent = 'Cannot reach server — is it running?'; err.classList.add('on'); }
+  finally { btn.disabled = false; txt.textContent = 'Access Dashboard'; sp.style.display = 'none'; }
+});
+
+function logout() {
+  sessionStorage.removeItem('al_tok'); TOKEN = ''; ALL = []; clearInterval(TIMER);
+  document.getElementById('scr-app').classList.remove('on');
+  document.getElementById('scr-login').style.display = 'flex';
+  document.getElementById('tok-in').value = '';
+  document.getElementById('lerr').classList.remove('on');
+}
+
+function launch() {
+  document.getElementById('scr-login').style.display = 'none';
+  document.getElementById('scr-app').classList.add('on');
+  checkHealth(); loadReviews();
+  clearInterval(TIMER); TIMER = setInterval(loadReviews, 15000);
+}
+
+/* ── Health ────────────────────────────── */
+async function checkHealth() {
+  const dot = document.getElementById('hdot'), lbl = document.getElementById('hlbl');
+  try {
+    const ok = (await fetch('/health')).ok;
+    dot.style.cssText = ok
+      ? 'background:var(--sl);box-shadow:0 0 7px var(--sl);animation:pgn 2.2s infinite'
+      : 'background:var(--sc);box-shadow:0 0 7px var(--sc);animation:none';
+    lbl.textContent = ok ? 'Healthy' : 'Degraded';
+  } catch { dot.style.cssText = 'background:var(--sc);animation:none'; lbl.textContent = 'Offline'; }
+  setTimeout(checkHealth, 30000);
+}
+
+/* ── Reviews list ──────────────────────── */
+async function loadReviews() {
+  if (!ALL.length)
+    document.getElementById('rlist').innerHTML = '<div class="ldrow"><div class="spin"></div><span>Loading reviews…</span></div>';
+  try {
+    const r = await apiGet('/reviews');
+    if (r.status === 401) { logout(); return; }
+    if (!r.ok) throw 0;
+    ALL = await r.json();
+    updStats(); renderRows();
+    if (RID && document.getElementById('view-det').classList.contains('on')) loadDet(RID);
+  } catch {
+    if (!ALL.length)
+      document.getElementById('rlist').innerHTML = errState('Could not load reviews','Check the server is running and your token is correct.');
+  }
+}
+
+function updStats() {
+  const c = s => ALL.filter(r => r.status === s).length;
+  document.getElementById('st-tot').textContent = ALL.length;
+  document.getElementById('st-aw').textContent  = c('awaiting_approval');
+  document.getElementById('st-po').textContent  = c('posted');
+  document.getElementById('st-ru').textContent  = c('running');
+}
+
+function setF(f, btn) {
+  FILTER = f;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  renderRows();
+}
+
+function renderRows() {
+  const q = (document.getElementById('srch').value || '').toLowerCase();
+  const items = ALL.filter(r => {
+    if (FILTER !== 'all' && r.status !== FILTER) return false;
+    return !q || (r.owner + '/' + r.repo + ' #' + r.number + ' ' + (r.review_summary || '')).toLowerCase().includes(q);
+  });
+  const list = document.getElementById('rlist');
+  if (!items.length) {
+    list.innerHTML = emptyState(
+      ALL.length ? 'No matching reviews' : 'No reviews yet',
+      ALL.length ? 'Try a different filter or search term.' : 'Reviews appear here when GitHub sends webhooks to this server.'
+    );
+    return;
+  }
+  list.innerHTML = items.map(rowHTML).join('');
+}
+
+function rowHTML(r) {
+  const sum = r.review_summary
+    ? h(r.review_summary.substring(0, 125)) + (r.review_summary.length > 125 ? '…' : '')
+    : '<em style="color:var(--text-tertiary)">' + slbl(r.status) + '…</em>';
+  return `<div class="rrow" tabindex="0"
+    onclick="openDet('${h(r.id)}')"
+    onkeydown="if(event.key==='Enter')openDet('${h(r.id)}')"
+    role="article" aria-label="${h(r.owner)}/${h(r.repo)} PR #${r.number}">
+    <div>
+      <div class="rrow-top">
+        <span class="rrepo">${h(r.owner)}/${h(r.repo)}</span>
+        <span class="pr-badge">#${r.number}</span>
+      </div>
+      <div class="rsum">${sum}</div>
+      <div class="rmeta">
+        <span class="rmeta-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${rt(r.created_at)}</span>
+        <span class="rmeta-i" style="font-family:var(--mono);font-size:11px">${h(r.id.substring(0,8))}</span>
+        ${r.head_sha ? '<span class="rmeta-i" style="font-family:var(--mono);font-size:11px">' + h(r.head_sha.substring(0,7)) + '</span>' : ''}
+      </div>
+    </div>
+    <div class="rrow-right">
+      <span class="sbadge s-${h(r.status)}"><span class="sdot"></span>${slbl(r.status)}</span>
+      <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+  </div>`;
+}
+
+/* ── Detail ────────────────────────────── */
+async function openDet(rid) {
+  RID = rid; showView('det');
+  document.getElementById('bc-cur').textContent = 'Loading…';
+  document.getElementById('det-ct').innerHTML = '<div class="ldrow"><div class="spin spin-lg"></div><span>Loading review…</span></div>';
+  await loadDet(rid);
+}
+
+async function loadDet(rid) {
+  try {
+    const res = await apiGet('/reviews/' + rid);
+    if (!res.ok) throw 0;
+    const r = await res.json();
+    document.getElementById('bc-cur').textContent = r.owner + '/' + r.repo + ' #' + r.number;
+    document.getElementById('det-ct').innerHTML = detHTML(r);
+  } catch {
+    document.getElementById('det-ct').innerHTML = errState('Review not found', 'The review may have been deleted or the server is unavailable.');
+  }
+}
+
+function detHTML(r) {
+  const rev = r.review || {}, usage = r.usage || {}, comments = rev.comments || [];
+  const sev = {critical:0,high:0,medium:0,low:0};
+  comments.forEach(c => { if (c.severity in sev) sev[c.severity]++; });
+  const canDec = r.status === 'awaiting_approval', running = r.status === 'running';
+  return `
+<div class="dheader">
+  <div class="dh-top">
+    <div class="drepo">${h(r.owner)}/${h(r.repo)}</div>
+    <span class="dpr">#${r.number}</span>
+    <span class="sbadge s-${h(r.status)}" style="margin-left:auto;flex-shrink:0"><span class="sdot"></span>${slbl(r.status)}</span>
+  </div>
+  <div class="dmeta">
+    <div class="dmeta-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Created ${rt(r.created_at)}</div>
+    <div class="dmeta-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Updated ${rt(r.updated_at)}</div>
+    ${r.head_sha ? '<div class="dmeta-i" style="font-family:var(--mono);font-size:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>' + h(r.head_sha.substring(0,12)) + '</div>' : ''}
+    ${r.review_url ? '<div class="dmeta-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><a href="' + h(r.review_url) + '" target="_blank" rel="noopener" style="color:var(--accent-hover);text-decoration:underline;text-underline-offset:3px">View on GitHub</a></div>' : ''}
+    ${r.error ? '<div class="dmeta-i" style="color:var(--sc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + h(r.error) + '</div>' : ''}
+  </div>
+</div>
+
+${running ? '<div class="run-banner"><div class="spin"></div><div class="run-banner-txt"><div class="run-ttl">Analysis in progress</div><div class="run-sub">The AI agents are reviewing this PR. Dashboard auto-refreshes every 15 s.</div></div></div>' : ''}
+
+${usage.llm_calls ? '<div class="usage-row">' +
+  '<div class="usage-i"><div class="usage-lbl">LLM Calls</div><div class="usage-val">' + usage.llm_calls + '</div></div>' +
+  '<div class="usage-i"><div class="usage-lbl">Input Tokens</div><div class="usage-val">' + fN(usage.input_tokens) + '</div></div>' +
+  '<div class="usage-i"><div class="usage-lbl">Output Tokens</div><div class="usage-val">' + fN(usage.output_tokens) + '</div></div>' +
+  (usage.cache_read_tokens ? '<div class="usage-i"><div class="usage-lbl">Cache Hits</div><div class="usage-val" style="color:var(--sl)">' + fN(usage.cache_read_tokens) + '</div></div>' : '') +
+'</div>' : ''}
+
+${rev.summary ? '<div class="sum-panel"><div class="sum-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>AI Summary</div><p class="sum-txt">' + h(rev.summary) + '</p></div>' : ''}
+
+<div class="findings-hdr">
+  <div class="findings-ttl">Findings <span class="fcnt">${comments.length}</span></div>
+  <div class="sev-bk">
+    ${sev.critical ? '<div class="spill sp-c"><div class="spill-d"></div>' + sev.critical + ' Critical</div>' : ''}
+    ${sev.high ? '<div class="spill sp-h"><div class="spill-d"></div>' + sev.high + ' High</div>' : ''}
+    ${sev.medium ? '<div class="spill sp-m"><div class="spill-d"></div>' + sev.medium + ' Medium</div>' : ''}
+    ${sev.low ? '<div class="spill sp-l"><div class="spill-d"></div>' + sev.low + ' Low</div>' : ''}
+  </div>
+</div>
+
+${comments.length === 0
+  ? '<div class="fcard"><div style="padding:40px;text-align:center;color:var(--text-tertiary)"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto 13px;opacity:.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><div style="font-size:14px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">No findings</div><div style="font-size:13px">The AI found no issues to report.</div></div></div>'
+  : comments.map(findHTML).join('')
+}
+
+${canDec ? `<div class="dec-panel">
+  <div class="dec-ttl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Ready for your decision</div>
+  <p class="dec-desc">Review the AI findings above, then approve to post them to GitHub or discard to skip this PR.</p>
+  <div class="dec-acts">
+    <button class="btn btn-reject" onclick="openM('m-reject')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Discard
+    </button>
+    <button class="btn btn-approve" onclick="openM('m-approve')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Approve &amp; Post
+    </button>
+  </div>
+</div>` : ''}`;
+}
+
+function findHTML(c) {
+  const s = c.severity || 'low';
+  const bs = {critical:'background:var(--scm);color:var(--sc);border:1px solid rgba(239,68,68,.22)',high:'background:var(--shm);color:var(--sh);border:1px solid rgba(249,115,22,.22)',medium:'background:var(--smm);color:var(--sm);border:1px solid rgba(234,179,8,.22)',low:'background:var(--slm);color:var(--sl);border:1px solid rgba(34,197,94,.22)'}[s]||'';
+  return `<div class="fcard">
+  <div class="fcard-hd">
+    <div class="fsev-bar fb-${h(s)}"></div>
+    <div class="finfo">
+      <div class="ftrow">
+        <span style="${bs};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;letter-spacing:.5px;flex-shrink:0">${s.toUpperCase()}</span>
+        <span class="ftitle">${h(c.title)}</span>
+        ${c.category ? '<span class="fcat">' + h(c.category) + '</span>' : ''}
+      </div>
+      <div class="floc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span style="color:var(--text-secondary)">${h(c.path)}</span>
+        <span>:</span><span style="color:var(--accent-hover)">L${c.line}</span>
+      </div>
+    </div>
+  </div>
+  ${c.explanation ? '<div class="fexpl">' + h(c.explanation) + '</div>' : ''}
+  ${c.suggestion ? '<div class="fsugg"><div class="fsugg-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Suggested fix</div><div class="fsugg-txt">' + h(c.suggestion) + '</div></div>' : ''}
+</div>`;
+}
+
+/* ── Decision ──────────────────────────── */
+function openM(id) { document.getElementById(id).classList.add('on'); }
+function closeM(id) { document.getElementById(id).classList.remove('on'); }
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeM(o.id); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.on').forEach(m => closeM(m.id)); });
+
+async function doDecision(approved) {
+  const mid = approved ? 'm-approve' : 'm-reject';
+  const bid = approved ? 'btn-approve' : 'btn-reject';
+  const btn = document.getElementById(bid);
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>' + (approved ? 'Posting…' : 'Discarding…');
+  try {
+    const res = await apiPost('/reviews/' + RID + '/decision', { approved });
+    if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.detail || res.status); }
+    closeM(mid);
+    toast(approved ? 's' : 'i', approved ? 'Review posted' : 'Review discarded', approved ? 'Comments published to GitHub.' : 'Nothing was posted to GitHub.');
+    await loadDet(RID);
+    loadReviews();
+  } catch (err) {
+    toast('e', 'Action failed', String(err.message || 'Unexpected error'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = approved
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Post Review'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Discard';
+  }
+}
+
+/* ── Navigation ────────────────────────── */
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+  document.getElementById('view-' + name).classList.add('on');
+  document.querySelectorAll('.nav-btn').forEach(n => { n.classList.remove('on'); n.removeAttribute('aria-current'); });
+  const nav = document.getElementById('nav-' + name);
+  if (nav) { nav.classList.add('on'); nav.setAttribute('aria-current', 'page'); }
+  if (name === 'dash') RID = null;
+}
+
+/* ── Helpers ───────────────────────────── */
+const apiGet  = p => fetch(p, { headers: { 'X-Admin-Token': TOKEN } });
+const apiPost = (p, b) => fetch(p, { method: 'POST', headers: { 'X-Admin-Token': TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+
+function toast(type, title, msg) {
+  const icons = {
+    s: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+    e: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    i: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+  const el = document.createElement('div');
+  el.className = 'toast t-' + type;
+  el.setAttribute('role', 'alert');
+  el.innerHTML = '<div class="t-ico">' + icons[type] + '</div><div><div class="t-ttl">' + h(title) + '</div><div class="t-msg">' + h(msg) + '</div></div>';
+  document.getElementById('toast-ct').appendChild(el);
+  setTimeout(() => { el.style.animation = 'tout .3s ease forwards'; setTimeout(() => el.remove(), 320); }, 4000);
+}
+
+function emptyState(title, desc) {
+  return `<div class="empty">
+    <div class="eicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+    <div class="etitle">${h(title)}</div><div class="edesc">${h(desc)}</div>
+  </div>`;
+}
+
+function errState(title, desc) {
+  return `<div class="empty">
+    <div class="eicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <div class="etitle">${h(title)}</div><div class="edesc">${h(desc)}</div>
+  </div>`;
+}
+
+function slbl(s) {
+  return {running:'Running',awaiting_approval:'Awaiting',posted:'Posted',rejected:'Rejected',failed:'Failed',done:'Done'}[s] || s;
+}
+function rt(iso) {
+  if (!iso) return '—';
+  const d = (Date.now() - new Date(iso)) / 1000;
+  if (d < 60) return 'just now';
+  if (d < 3600) return Math.floor(d / 60) + 'm ago';
+  if (d < 86400) return Math.floor(d / 3600) + 'h ago';
+  if (d < 604800) return Math.floor(d / 86400) + 'd ago';
+  return new Date(iso).toLocaleDateString();
+}
+function fN(n) {
+  if (!n) return '0';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function h(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>

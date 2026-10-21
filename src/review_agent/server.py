@@ -22,16 +22,18 @@ import sqlite3
 import threading
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 from pydantic import BaseModel
+
 
 from .graph import Deps, build_graph
 from .workspace import GitHubWorkspace, Workspace
@@ -65,7 +67,7 @@ class ReviewStore:
 
     def create(self, pr: dict, head_sha: str) -> str:
         rid = uuid.uuid4().hex
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self.lock:
             self.conn.execute("INSERT INTO reviews VALUES (?,?,?,?,?,?,?,?,?,?)",
                               (rid, pr["owner"], pr["repo"], pr["number"], head_sha, "running",
@@ -74,7 +76,7 @@ class ReviewStore:
         return rid
 
     def update(self, rid: str, **fields: Any) -> None:
-        fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+        fields["updated_at"] = datetime.now(UTC).isoformat()
         cols = ", ".join(f"{k} = ?" for k in fields)
         with self.lock:
             self.conn.execute(f"UPDATE reviews SET {cols} WHERE id = ?", (*fields.values(), rid))
@@ -146,9 +148,12 @@ def create_app(
         return {"status": "ok"}
 
     @app.post("/webhook", status_code=202)
-    async def webhook(request: Request, background: BackgroundTasks,
-                      x_hub_signature_256: str | None = Header(default=None),
-                      x_github_event: str | None = Header(default=None)) -> dict:
+    async def webhook(
+        request: Request,
+        background: BackgroundTasks,
+        x_hub_signature_256: Annotated[str | None, Header()] = None,
+        x_github_event: Annotated[str | None, Header()] = None,
+    ) -> dict:
         body = await request.body()
         if not verify_signature(os.environ.get("GITHUB_WEBHOOK_SECRET", ""), body, x_hub_signature_256):
             raise HTTPException(status_code=401, detail="bad signature")
@@ -211,9 +216,11 @@ def create_app(
 
 
 def main() -> None:
-    import uvicorn
-
-    uvicorn.run(create_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+    uvicorn.run(
+        create_app(),
+        host=os.environ.get("HOST", "0.0.0.0"),  # noqa: S104
+        port=int(os.environ.get("PORT", "8000")),
+    )
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 import httpx
@@ -172,11 +173,10 @@ class LocalWorkspace:
         if path in self.files:
             return _truncate(self.files[path])
         if self.repo_path:
-            root = os.path.realpath(self.repo_path)
-            full = os.path.realpath(os.path.join(root, path))
-            if full.startswith(root + os.sep) and os.path.isfile(full):
-                with open(full, encoding="utf-8", errors="replace") as f:
-                    return _truncate(f.read())
+            root = Path(self.repo_path).resolve()
+            full = (root / path).resolve()
+            if full.is_relative_to(root) and full.is_file():
+                return _truncate(full.read_text(encoding="utf-8", errors="replace"))
         raise FileNotFoundError(path)
 
     def post_review(self, body: str, comments: list[dict]) -> str:
